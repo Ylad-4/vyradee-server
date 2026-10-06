@@ -47,14 +47,14 @@ services:
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
 
-      - key: META_APP_ID
-        sync: false
+      # - key: META_APP_ID
+      #   sync: false
 
-      - key: META_APP_SECRET
-        sync: false
+      # - key: META_APP_SECRET
+      #   sync: false
 
-      - key: META_REDIRECT_URI
-        sync: false
+      # - key: META_REDIRECT_URI
+      #   sync: false
 
       - key: META_GRAPH_VERSION
         value: v24.0
