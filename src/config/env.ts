@@ -15,6 +15,10 @@ const schema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_REDIRECT_URI: z.string().url().optional(),
+  META_GRAPH_VERSION: z.string().default('v24.0'),
 });
 
 const values = schema.parse(process.env);

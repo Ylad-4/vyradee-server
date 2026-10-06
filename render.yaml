@@ -6,55 +6,38 @@ services:
     buildCommand: npm ci && npm run setup && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-
     envVars:
       - key: NODE_ENV
         value: production
-
       - key: HOST
         value: 0.0.0.0
-
       - key: PORT
         value: 10000
-
       - key: CORS_ORIGIN
         value: "*"
-
       - key: SUPABASE_PROJECT_REF
         value: jmfgalpnotsfexyhxnrj
-
       - key: SUPABASE_POOLER_HOST
         sync: false
-
       - key: SUPABASE_DB_PASSWORD
         sync: false
-
       - key: JWT_SECRET
         generateValue: true
-
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
-
       - key: CLOUDINARY_API_KEY
         sync: false
-
       - key: CLOUDINARY_API_SECRET
         sync: false
-
       - key: GEMINI_API_KEY
         sync: false
-
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
-
-      # - key: META_APP_ID
-      #   sync: false
-
-      # - key: META_APP_SECRET
-      #   sync: false
-
-      # - key: META_REDIRECT_URI
-      #   sync: false
-
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_REDIRECT_URI
+        sync: false
       - key: META_GRAPH_VERSION
         value: v24.0

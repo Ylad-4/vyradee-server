@@ -46,3 +46,22 @@ The API stores workflow records and media references. It never returns password 
 6. The creator edits and approves platform variants in Content Studio.
 
 Cloudinary and Gemini secrets stay on the server. Never put them in the Expo `.env`.
+
+## Meta connection
+
+The API includes OAuth connection for Facebook Pages and their linked Instagram professional accounts.
+
+Required server variables:
+
+```env
+META_APP_ID=""
+META_APP_SECRET=""
+META_REDIRECT_URI="https://YOUR-RENDER-SERVICE.onrender.com/api/social-accounts/meta/callback"
+META_GRAPH_VERSION="v24.0"
+```
+
+The callback exchanges the authorization code, discovers available Pages and linked Instagram professional accounts, encrypts Page access tokens before database storage, and returns to the app. The app can also disconnect an account.
+
+## Render deployment
+
+`render.yaml` contains a ready-to-use free web-service configuration. Deploy the `server` folder or use it as the repository root. Add every secret marked `sync: false` in the Render dashboard. After deployment, set `META_REDIRECT_URI` to the final Render URL and use the same value in the Meta developer dashboard.
