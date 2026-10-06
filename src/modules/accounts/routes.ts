@@ -1,0 +1,11 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { parseOrThrow } from '../../lib/schemas.js';
+import { getWorkspaceForUser } from '../../lib/workspace.js';
+const paramsSchema=z.object({id:z.string().min(1)});
+const accountSchema=z.object({platform:z.enum(['INSTAGRAM','TIKTOK','YOUTUBE','FACEBOOK','X','LINKEDIN']),accountName:z.string().min(1).max(100),externalAccountId:z.string().max(200).optional(),connected:z.boolean().default(false)});
+const routes:FastifyPluginAsync=async(app)=>{app.addHook('preHandler',app.authenticate);
+ app.get('/',async(request)=>{const workspace=await getWorkspaceForUser(app,request.user.id);return app.prisma.socialAccount.findMany({where:{workspaceId:workspace.id},orderBy:{createdAt:'asc'},select:{id:true,platform:true,accountName:true,externalAccountId:true,connected:true,tokenExpiresAt:true,createdAt:true,updatedAt:true}})});
+ app.post('/',async(request,reply)=>{const workspace=await getWorkspaceForUser(app,request.user.id);const data=parseOrThrow(accountSchema,request.body);const account=await app.prisma.socialAccount.create({data:{workspaceId:workspace.id,...data},select:{id:true,platform:true,accountName:true,externalAccountId:true,connected:true,createdAt:true}});return reply.code(201).send(account)});
+ app.delete('/:id',async(request,reply)=>{const workspace=await getWorkspaceForUser(app,request.user.id);const{id}=parseOrThrow(paramsSchema,request.params);const result=await app.prisma.socialAccount.deleteMany({where:{id,workspaceId:workspace.id}});if(!result.count)return reply.notFound('Social account not found');return reply.code(204).send()});
+};export default routes;

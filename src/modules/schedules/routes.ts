@@ -1,0 +1,11 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { parseOrThrow } from '../../lib/schemas.js';
+import { getWorkspaceForUser } from '../../lib/workspace.js';
+const createSchema=z.object({contentId:z.string(),variantId:z.string(),socialAccountId:z.string(),scheduledFor:z.string().datetime(),timezone:z.string().min(1).max(100)});
+const paramsSchema=z.object({id:z.string().min(1)});
+const routes:FastifyPluginAsync=async(app)=>{app.addHook('preHandler',app.authenticate);
+ app.get('/',async(request)=>{const workspace=await getWorkspaceForUser(app,request.user.id);return app.prisma.schedule.findMany({where:{content:{workspaceId:workspace.id}},orderBy:{scheduledFor:'asc'},include:{content:{select:{id:true,title:true,status:true,mediaType:true}},variant:true,socialAccount:{select:{id:true,platform:true,accountName:true,connected:true}},publication:true}})});
+ app.post('/',async(request,reply)=>{const workspace=await getWorkspaceForUser(app,request.user.id);const data=parseOrThrow(createSchema,request.body);const [content,variant,account]=await Promise.all([app.prisma.contentItem.findFirst({where:{id:data.contentId,workspaceId:workspace.id}}),app.prisma.platformVariant.findFirst({where:{id:data.variantId,contentId:data.contentId}}),app.prisma.socialAccount.findFirst({where:{id:data.socialAccountId,workspaceId:workspace.id}})]);if(!content||!variant||!account)return reply.badRequest('Content, variant, or social account is invalid');if(variant.status!=='APPROVED')return reply.badRequest('Approve the platform variant before scheduling');const schedule=await app.prisma.schedule.create({data:{...data,scheduledFor:new Date(data.scheduledFor)},include:{variant:true,socialAccount:true}});await app.prisma.contentItem.update({where:{id:data.contentId},data:{status:'SCHEDULED'}});return reply.code(201).send(schedule)});
+ app.delete('/:id',async(request,reply)=>{const workspace=await getWorkspaceForUser(app,request.user.id);const{id}=parseOrThrow(paramsSchema,request.params);const existing=await app.prisma.schedule.findFirst({where:{id,content:{workspaceId:workspace.id}}});if(!existing)return reply.notFound('Schedule not found');await app.prisma.schedule.delete({where:{id}});return reply.code(204).send()});
+};export default routes;

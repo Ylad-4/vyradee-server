@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum MediaType {
+  VIDEO
+  IMAGE
+  TEXT
+}
+
+enum ContentStatus {
+  DRAFT
+  PROCESSING
+  NEEDS_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum ProcessingStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum Confidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Platform {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  FACEBOOK
+  X
+  LINKEDIN
+}
+
+enum VariantStatus {
+  DRAFT
+  NEEDS_REVIEW
+  APPROVED
+}
+
+enum PublicationStatus {
+  QUEUED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  APPROVAL
+  PUBLISHING
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  displayName  String?
+  bio          String?  @db.VarChar(300)
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
+  memberships WorkspaceMember[]
+  content ContentItem[]
+  approvals Approval[]
+  notifications Notification[]
+  auditEvents AuditEvent[]
+
+  // Legacy social-network relations retained to avoid destructive migration.
+  comments Comment[]
+  following Follow[] @relation("userFollowing")
+  followers Follow[] @relation("userFollowers")
+  likes Like[]
+  posts Post[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  owner     User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members WorkspaceMember[]
+  brandProfile BrandProfile?
+  socialAccounts SocialAccount[]
+  content ContentItem[]
+  notifications Notification[]
+  auditEvents AuditEvent[]
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId String
+  role WorkspaceRole @default(EDITOR)
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+model BrandProfile {
+  id String @id @default(cuid())
+  workspaceId String @unique
+  identity String?
+  positioning String?
+  audience String?
+  voice String?
+  preferredLanguage String?
+  prohibitedLanguage String?
+  contentThemes String[] @default([])
+  publishingRules String[] @default([])
+  completion Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model SocialAccount {
+  id String @id @default(cuid())
+  workspaceId String
+  platform Platform
+  accountName String
+  externalAccountId String?
+  connected Boolean @default(false)
+  tokenReference String?
+  tokenExpiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  schedules Schedule[]
+  publications Publication[]
+  @@unique([workspaceId, platform, accountName])
+  @@index([workspaceId])
+}
+
+model ContentItem {
+  id String @id @default(cuid())
+  workspaceId String
+  ownerId String
+  title String
+  description String?
+  mediaType MediaType
+  mediaUrl String?
+  mediaPublicId String?
+  thumbnailUrl String?
+  mediaFormat String?
+  mediaBytes Int?
+  originalFilename String?
+  durationSeconds Int?
+  width Int?
+  height Int?
+  status ContentStatus @default(DRAFT)
+  processingStatus ProcessingStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  analysis ContentAnalysis?
+  variants PlatformVariant[]
+  approvals Approval[]
+  schedules Schedule[]
+  publications Publication[]
+  performance PerformanceSnapshot[]
+  @@index([workspaceId, status, updatedAt])
+  @@index([ownerId])
+}
+
+model ContentAnalysis {
+  id String @id @default(cuid())
+  contentId String @unique
+  topic String?
+  summary String?
+  audience String?
+  purpose String?
+  tone String?
+  confidence Confidence @default(MEDIUM)
+  keyMoments Json?
+  uncertainties String[] @default([])
+  recommendations Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+}
+
+model PlatformVariant {
+  id String @id @default(cuid())
+  contentId String
+  platform Platform
+  hook String?
+  title String?
+  caption String?
+  cta String?
+  hashtags String[] @default([])
+  status VariantStatus @default(DRAFT)
+  warnings String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  approvals Approval[]
+  schedules Schedule[]
+  publications Publication[]
+  @@unique([contentId, platform])
+  @@index([contentId])
+}
+
+model Approval {
+  id String @id @default(cuid())
+  contentId String
+  variantId String?
+  approvedById String
+  approvedAt DateTime @default(now())
+  note String?
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  variant PlatformVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  approvedBy User @relation(fields: [approvedById], references: [id], onDelete: Cascade)
+  @@index([contentId, approvedAt])
+}
+
+model Schedule {
+  id String @id @default(cuid())
+  contentId String
+  variantId String
+  socialAccountId String
+  scheduledFor DateTime
+  timezone String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  variant PlatformVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  publication Publication?
+  @@index([scheduledFor])
+  @@index([contentId])
+}
+
+model Publication {
+  id String @id @default(cuid())
+  contentId String
+  variantId String
+  socialAccountId String
+  scheduleId String? @unique
+  status PublicationStatus @default(QUEUED)
+  externalPostId String?
+  externalUrl String?
+  errorMessage String?
+  attempts Int @default(0)
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  variant PlatformVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  schedule Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  @@index([status, createdAt])
+}
+
+model PerformanceSnapshot {
+  id String @id @default(cuid())
+  contentId String
+  platform Platform
+  capturedAt DateTime @default(now())
+  views Int @default(0)
+  reach Int @default(0)
+  likes Int @default(0)
+  comments Int @default(0)
+  shares Int @default(0)
+  saves Int @default(0)
+  watchTimeSeconds Int?
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  @@index([contentId, capturedAt])
+}
+
+model Notification {
+  id String @id @default(cuid())
+  workspaceId String
+  userId String
+  type NotificationType @default(INFO)
+  title String
+  message String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, readAt, createdAt])
+}
+
+model AuditEvent {
+  id String @id @default(cuid())
+  workspaceId String
+  actorId String
+  action String
+  entityType String
+  entityId String
+  metadata Json?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+}
+
+// Legacy models kept only so setup never drops the user's original tables.
+model Post {
+  id String @id @default(cuid())
+  content String @db.VarChar(2000)
+  imageUrl String?
+  authorId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  comments Comment[]
+  likes Like[]
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  @@index([authorId, createdAt])
+  @@index([createdAt])
+}
+model Comment {
+  id String @id @default(cuid())
+  content String @db.VarChar(1000)
+  authorId String
+  postId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@index([postId, createdAt])
+}
+model Like {
+  userId String
+  postId String
+  createdAt DateTime @default(now())
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, postId])
+  @@index([postId])
+}
+model Follow {
+  followerId String
+  followingId String
+  createdAt DateTime @default(now())
+  follower User @relation("userFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("userFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  @@id([followerId, followingId])
+  @@index([followingId])
+}

@@ -1,0 +1,2 @@
+import type { FastifyPluginAsync } from 'fastify';
+const routes:FastifyPluginAsync=async(app)=>{app.get('/',async(_,reply)=>{try{await app.prisma.$queryRaw`SELECT 1`;return{status:'ok',service:'vyradee-social-api',database:'connected',timestamp:new Date().toISOString()}}catch{reply.code(503);return{status:'error',service:'vyradee-social-api',database:'unavailable',timestamp:new Date().toISOString()}}})};export default routes;
